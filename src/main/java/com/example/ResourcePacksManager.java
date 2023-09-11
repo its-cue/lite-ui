@@ -63,8 +63,7 @@ import okhttp3.Response;
 
 @Singleton
 @Slf4j
-public class ResourcePacksManager
-{
+public class ResourcePacksManager {
 	@Getter
 	private final Properties colorProperties = new Properties();
 	private SpritePixels[] defaultCrossSprites;
@@ -110,8 +109,7 @@ public class ResourcePacksManager
 						{
 							loadedPacks.put(man.getInternalName(), man);
 						}
-					}
-					catch (IOException ignored)
+					} catch (IOException ignored)
 					{
 					}
 				}
@@ -119,18 +117,16 @@ public class ResourcePacksManager
 		}
 
 		List<String> installedIDs = getInstalledResourcePacks();
-		if (installedIDs.isEmpty() && loadedPacks.isEmpty())
-		{
+		if (installedIDs.isEmpty() && loadedPacks.isEmpty()) {
 			return;
 		}
 
 		Set<ResourcePackManifest> resourcePacks = new HashSet<>();
 		List<ResourcePackManifest> manifestList;
-		try
-		{
+		try {
 			manifestList = resourcePacksClient.downloadManifest();
 			Map<String, ResourcePackManifest> manifests = manifestList
-				.stream().collect(ImmutableMap.toImmutableMap(ResourcePackManifest::getInternalName, Function.identity()));
+					.stream().collect(ImmutableMap.toImmutableMap(ResourcePackManifest::getInternalName, Function.identity()));
 
 			Set<ResourcePackManifest> needsDownload = new HashSet<>();
 			Set<File> keep = new HashSet<>();
@@ -138,65 +134,51 @@ public class ResourcePacksManager
 			List<File> resourcePackDirectoryList = Arrays.asList(resourcePackDirectories);
 
 			// Check for changed commits and packs that need to be downloaded
-			for (String name : installedIDs)
-			{
+			for (String name : installedIDs) {
 				ResourcePackManifest manifest = manifests.get(name);
-				if (manifest != null)
-				{
+				if (manifest != null) {
 					resourcePacks.add(manifest);
 					ResourcePackManifest loadedResourcePack = loadedPacks.get(manifest.getInternalName());
 					File resourcePackDirectory = new File(ResourcePacksPlugin.RESOURCEPACKS_DIR.toPath() + File.separator + manifest.getInternalName());
-					if (loadedResourcePack == null || !loadedResourcePack.equals(manifest))
-					{
+					if (loadedResourcePack == null || !loadedResourcePack.equals(manifest)) {
 						needsDownload.add(manifest);
-					}
-					else if (loadedResourcePack.getCommit().equals(manifest.getCommit()) && resourcePackDirectoryList.contains(resourcePackDirectory))
-					{
+					} else if (loadedResourcePack.getCommit().equals(manifest.getCommit()) && resourcePackDirectoryList.contains(resourcePackDirectory)) {
 						keep.add(resourcePackDirectory);
 					}
 				}
 			}
 
 			// delete old packs
-			for (File fi : resourcePackDirectoryList)
-			{
-				if (!keep.contains(fi) && !fi.getPath().equals(ResourcePacksPlugin.NOTICE_FILE.getPath()))
-				{
+			for (File fi : resourcePackDirectoryList) {
+				if (!keep.contains(fi) && !fi.getPath().equals(ResourcePacksPlugin.NOTICE_FILE.getPath())) {
 					MoreFiles.deleteRecursively(fi.toPath(), RecursiveDeleteOption.ALLOW_INSECURE);
 				}
 			}
 
 			// Download packs that need updates/install
-			for (ResourcePackManifest manifest : needsDownload)
-			{
+			for (ResourcePackManifest manifest : needsDownload) {
 				HttpUrl url = GITHUB.newBuilder()
-					.addPathSegment("archive")
-					.addPathSegment(manifest.getCommit() + ".zip")
-					.build();
+						.addPathSegment("archive")
+						.addPathSegment(manifest.getCommit() + ".zip")
+						.build();
 
-				try (Response res = RuneLiteAPI.CLIENT.newCall(new Request.Builder().url(url).build()).execute())
-				{
+				try (Response res = RuneLiteAPI.CLIENT.newCall(new Request.Builder().url(url).build()).execute()) {
 					BufferedInputStream is = new BufferedInputStream(res.body().byteStream());
 					ZipInputStream zipInputStream = new ZipInputStream(is);
 					ZipEntry entry;
-					while ((entry = zipInputStream.getNextEntry()) != null)
-					{
+					while ((entry = zipInputStream.getNextEntry()) != null) {
 						String filePath = ResourcePacksPlugin.RESOURCEPACKS_DIR.getPath() + File.separator +
-							(entry.getName().replaceAll("resource-packs-" + manifest.getCommit(), manifest.getInternalName()));
-						if (!entry.isDirectory())
-						{
+								(entry.getName().replaceAll("resource-packs-" + manifest.getCommit(), manifest.getInternalName()));
+						if (!entry.isDirectory()) {
 							// if the entry is a file, extracts it
 							BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath));
 							byte[] bytesIn = new byte[2048];
 							int read;
-							while ((read = zipInputStream.read(bytesIn)) != -1)
-							{
+							while ((read = zipInputStream.read(bytesIn)) != -1) {
 								bos.write(bytesIn, 0, read);
 							}
 							bos.close();
-						}
-						else
-						{
+						} else {
 							// if the entry is a directory, make the directory
 							File dir = new File(filePath);
 							dir.mkdir();
@@ -210,36 +192,28 @@ public class ResourcePacksManager
 					RuneLiteAPI.GSON.toJson(manifest, manifestWriter);
 					manifestWriter.close();
 					// In case of total resource folder nuke
-					if (config.selectedHubPack().equals(manifest.getInternalName()))
-					{
+					if (config.selectedHubPack().equals(manifest.getInternalName())) {
 						clientThread.invokeLater(this::updateAllOverrides);
 					}
-				}
-				catch (IOException e)
-				{
+				} catch (IOException e) {
 					resourcePacks.remove(manifest);
 					log.error("Unable to download resource pack \"{}\"", manifest.getInternalName(), e);
 				}
 			}
-		}
-		catch (IOException e)
-		{
+		} catch (IOException e) {
 			log.error("Unable to download resource packs", e);
 			return;
 		}
-		for (ResourcePackManifest ex : resourcePacks)
-		{
+		for (ResourcePackManifest ex : resourcePacks) {
 			loadedPacks.remove(ex.getInternalName());
 		}
 
 		// list of installed packs that aren't in the manifest
 		Collection<ResourcePackManifest> remove = loadedPacks.values();
-		for (ResourcePackManifest rem : remove)
-		{
+		for (ResourcePackManifest rem : remove) {
 			log.info("Removing pack \"{}\"", rem.getInternalName());
 			Set<String> packs = new HashSet<>(getInstalledResourcePacks());
-			if (packs.remove(rem.getInternalName()))
-			{
+			if (packs.remove(rem.getInternalName())) {
 				configManager.setConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.HUB_RESOURCEPACKS, Text.toCSV(packs));
 			}
 		}
@@ -247,8 +221,7 @@ public class ResourcePacksManager
 		eventBus.post(new ResourcePacksChanged(manifestList));
 	}
 
-	private ResourcePackManifest getResourcePackManifest(File resourcePackDirectory) throws IOException
-	{
+	private ResourcePackManifest getResourcePackManifest(File resourcePackDirectory) throws IOException {
 		File manifest = new File(resourcePackDirectory.getPath() + File.separator + "manifest.js");
 		JsonReader reader = new JsonReader(new FileReader(manifest));
 		ResourcePackManifest packManifest = RuneLiteAPI.GSON.fromJson(reader, ResourcePackManifest.class);
@@ -256,16 +229,12 @@ public class ResourcePacksManager
 		return packManifest;
 	}
 
-	public HashMultimap<String, ResourcePackManifest> getCurrentManifests() throws IOException
-	{
+	public HashMultimap<String, ResourcePackManifest> getCurrentManifests() throws IOException {
 		HashMultimap<String, ResourcePackManifest> currentManifests = HashMultimap.create();
 		File[] directories = ResourcePacksPlugin.RESOURCEPACKS_DIR.listFiles();
-		if (directories != null)
-		{
-			for (File resourcePackDirectory : directories)
-			{
-				if (!resourcePackDirectory.isDirectory())
-				{
+		if (directories != null) {
+			for (File resourcePackDirectory : directories) {
+				if (!resourcePackDirectory.isDirectory()) {
 					continue;
 				}
 				ResourcePackManifest resourcePackManifest = getResourcePackManifest(resourcePackDirectory);
@@ -275,16 +244,12 @@ public class ResourcePacksManager
 		return currentManifests;
 	}
 
-	public void setSelectedHubPack(String internalName)
-	{
-		if (!internalName.equals("None"))
-		{
+	public void setSelectedHubPack(String internalName) {
+		if (!internalName.equals("None")) {
 			configManager.setConfiguration(ResourcePacksConfig.GROUP_NAME, "resourcePack", ResourcePacksConfig.ResourcePack.HUB);
 			configManager.setConfiguration(ResourcePacksConfig.GROUP_NAME, "selectedHubPack", internalName);
 			clientThread.invokeLater(this::updateAllOverrides);
-		}
-		else
-		{
+		} else {
 			configManager.setConfiguration(ResourcePacksConfig.GROUP_NAME, "selectedHubPack", "");
 			clientThread.invokeLater(() ->
 			{
@@ -296,17 +261,14 @@ public class ResourcePacksManager
 		}
 	}
 
-	public List<String> getInstalledResourcePacks()
-	{
+	public List<String> getInstalledResourcePacks() {
 		String resourcePacksString = configManager.getConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.HUB_RESOURCEPACKS);
 		return Text.fromCSV(resourcePacksString == null ? "" : resourcePacksString);
 	}
 
-	public void install(String internalName)
-	{
+	public void install(String internalName) {
 		Set<String> packs = new HashSet<>(getInstalledResourcePacks());
-		if (packs.add(internalName))
-		{
+		if (packs.add(internalName)) {
 			log.debug("Installing: " + internalName);
 			configManager.setConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.HUB_RESOURCEPACKS, Text.toCSV(packs));
 			configManager.setConfiguration(ResourcePacksConfig.GROUP_NAME, "resourcePack", ResourcePacksConfig.ResourcePack.HUB);
@@ -318,25 +280,20 @@ public class ResourcePacksManager
 		}
 	}
 
-	public void remove(String internalName)
-	{
+	public void remove(String internalName) {
 		Set<String> packs = new HashSet<>(getInstalledResourcePacks());
-		if (packs.remove(internalName))
-		{
+		if (packs.remove(internalName)) {
 			log.debug("Removing: " + internalName);
 			configManager.setConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.HUB_RESOURCEPACKS, Text.toCSV(packs));
-			if (config.selectedHubPack() != null && config.selectedHubPack().equals(internalName))
-			{
+			if (config.selectedHubPack() != null && config.selectedHubPack().equals(internalName)) {
 				setSelectedHubPack("None");
 			}
 			executor.submit(this::refreshPlugins);
 		}
 	}
 
-	void updateAllOverrides()
-	{
-		if (!checkIfResourcePackPathIsNotEmpty())
-		{
+	void updateAllOverrides() {
+		if (!checkIfResourcePackPathIsNotEmpty()) {
 			return;
 		}
 		removeGameframe();
@@ -349,21 +306,18 @@ public class ResourcePacksManager
 		changeCrossSprites();
 	}
 
-	void removeGameframe()
-	{
+	void removeGameframe() {
 		restoreSprites();
 
 		BufferedImage compassImage = spriteManager.getSprite(SpriteID.COMPASS_TEXTURE, 0);
 
-		if (compassImage != null)
-		{
+		if (compassImage != null) {
 			SpritePixels compass = ImageUtil.getImageSpritePixels(compassImage, client);
 			client.setCompass(compass);
 		}
 	}
 
-	void adjustWidgetDimensions(boolean modify)
-	{
+	void adjustWidgetDimensions(boolean modify) {
 		for (WidgetResize widgetResize : WidgetResize.values()) {
 			for (Integer childId : widgetResize.getChild()) {
 				Widget widget = client.getWidget(widgetResize.getGroup(), childId);
@@ -388,7 +342,11 @@ public class ResourcePacksManager
 					}
 
 					if (widgetResize.getOriginalHeight() != null) {
+						/**if(widgetResize.getGroup() == WidgetResize.Group.HOUSE_OPTIONS_GROUP) {
+						 widget.setSpriteTiling(false);//set to stretched, confirmed sprite tiling was setting clipping mask instead of resizing sprites width and height
+						 }*/
 						widget.setOriginalHeight(modify ? widgetResize.getModifiedHeight() : widgetResize.getOriginalHeight());
+
 					}
 				}
 				if (widget != null) {
@@ -472,8 +430,7 @@ public class ResourcePacksManager
 		return true;
 	}
 
-	public SpritePixels getSpritePixels(SpriteOverride spriteOverride, String currentPackPath)
-	{
+	public SpritePixels getSpritePixels(SpriteOverride spriteOverride, String currentPackPath) {
 		String folder = spriteOverride.getFolder().name().toLowerCase();
 		String name = spriteOverride.name().toLowerCase();
 		if (!folder.equals("other"))
@@ -496,53 +453,40 @@ public class ResourcePacksManager
 				image = dye(image, config.colorPack());
 			}
 			return ImageUtil.getImageSpritePixels(image, client);
-		}
-		catch (RuntimeException | IOException ex)
+		} catch (RuntimeException | IOException ex)
 		{
 			log.debug("Unable to find image (" + spriteFile.getPath() + "): ");
 		}
 		return null;
 	}
 
-	void overrideSprites()
-	{
+	void overrideSprites() {
 		String currentPackPath = getCurrentPackPath();
 		SpriteOverride.getOverrides().asMap().forEach((key, collection) -> {
 			if (!Files.isDirectory(Paths.get(currentPackPath + File.separator + key.name().toLowerCase())) ||
-				(!config.allowSpellsPrayers() && (key.name().contains("SPELL") || key.equals(SpriteOverride.Folder.PRAYER))) ||
-				key == SpriteOverride.Folder.CROSS_SPRITES)
-			{
+					(!config.allowSpellsPrayers() && (key.name().contains("SPELL") || key.equals(SpriteOverride.Folder.PRAYER))) ||
+					key == SpriteOverride.Folder.CROSS_SPRITES) {
 				return;
 			}
 
-			for (SpriteOverride spriteOverride : collection)
-			{
+			for (SpriteOverride spriteOverride : collection) {
 
 				SpritePixels spritePixels = getSpritePixels(spriteOverride, currentPackPath);
-				if (config.allowLoginScreen() && spriteOverride == SpriteOverride.LOGIN_SCREEN_BACKGROUND)
-				{
-					if (spritePixels != null)
-					{
+				if (config.allowLoginScreen() && spriteOverride == SpriteOverride.LOGIN_SCREEN_BACKGROUND) {
+					if (spritePixels != null) {
 						client.setLoginScreen(spritePixels);
-					}
-					else
-					{
+					} else {
 						resetLoginScreen();
 					}
 				}
-				if (spritePixels == null)
-				{
+				if (spritePixels == null) {
 					continue;
 				}
 
-				if (spriteOverride.getSpriteID() == SpriteID.COMPASS_TEXTURE)
-				{
+				if (spriteOverride.getSpriteID() == SpriteID.COMPASS_TEXTURE) {
 					client.setCompass(spritePixels);
-				}
-				else
-				{
-					if (spriteOverride.getSpriteID() < -200)
-					{
+				} else {
+					if (spriteOverride.getSpriteID() < -200) {
 						client.getSpriteOverrides().remove(spriteOverride.getSpriteID());
 					}
 					client.getSpriteOverrides().put(spriteOverride.getSpriteID(), spritePixels);
@@ -551,18 +495,14 @@ public class ResourcePacksManager
 		});
 	}
 
-	void reloadBankTagSprites()
-	{
+	void reloadBankTagSprites() {
 		String currentPackPath = getCurrentPackPath();
 		SpriteOverride.getOverrides().asMap().forEach((key, collection) -> {
-			if (!Files.isDirectory(Paths.get(currentPackPath + File.separator + key.name().toLowerCase())))
-			{
+			if (!Files.isDirectory(Paths.get(currentPackPath + File.separator + key.name().toLowerCase()))) {
 				return;
 			}
-			for (SpriteOverride spriteOverride : collection)
-			{
-				if (spriteOverride.getSpriteID() < -200)
-				{
+			for (SpriteOverride spriteOverride : collection) {
+				if (spriteOverride.getSpriteID() < -200) {
 					SpritePixels spritePixels = getSpritePixels(spriteOverride, currentPackPath);
 					client.getSpriteOverrides().remove(spriteOverride.getSpriteID());
 					client.getSpriteOverrides().put(spriteOverride.getSpriteID(), spritePixels);
@@ -571,8 +511,7 @@ public class ResourcePacksManager
 		});
 	}
 
-	void resetLoginScreen()
-	{
+	void resetLoginScreen() {
 		ConfigChanged loginScreenConfigChanged = new ConfigChanged();
 		loginScreenConfigChanged.setGroup("loginscreen");
 		loginScreenConfigChanged.setKey("loginScreen");
@@ -581,38 +520,30 @@ public class ResourcePacksManager
 		eventBus.post(loginScreenConfigChanged);
 	}
 
-	void reloadColorProperties()
-	{
+	void reloadColorProperties() {
 		colorProperties.clear();
 		File colorPropertiesFile = new File(getCurrentPackPath() + "/color.properties");
-		try (InputStream in = new FileInputStream(colorPropertiesFile))
-		{
+		try (InputStream in = new FileInputStream(colorPropertiesFile)) {
 			colorProperties.load(in);
-		}
-		catch (IOException e)
-		{
+		} catch (IOException e) {
 			log.debug("Color properties not found");
 			resetOverlayColor();
 			return;
 		}
-		if (config.allowOverlayColor())
-		{
+		if (config.allowOverlayColor()) {
 			changeOverlayColor();
 		}
 		// Add more properties
 	}
 
-	void changeOverlayColor()
-	{
-		if (configManager.getConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.ORIGINAL_OVERLAY_COLOR) == null)
-		{
+	void changeOverlayColor() {
+		if (configManager.getConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.ORIGINAL_OVERLAY_COLOR) == null) {
 			configManager.setConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.ORIGINAL_OVERLAY_COLOR,
-				configManager.getConfiguration(RuneLiteConfig.GROUP_NAME, OVERLAY_COLOR_CONFIG));
+					configManager.getConfiguration(RuneLiteConfig.GROUP_NAME, OVERLAY_COLOR_CONFIG));
 		}
 		ResourcePacksPlugin.setIgnoreOverlayConfig(true);
 		Color overlayColor = ColorUtil.fromHex(colorProperties.getProperty("overlay_color"));
-		if (config.allowColorPack() && config.colorPack() != null && config.colorPack().getAlpha() != 0 && config.colorPackOverlay())
-		{
+		if (config.allowColorPack() && config.colorPack() != null && config.colorPack().getAlpha() != 0 && config.colorPackOverlay()) {
 			overlayColor = config.colorPack();
 		}
 
@@ -620,12 +551,10 @@ public class ResourcePacksManager
 		ResourcePacksPlugin.setIgnoreOverlayConfig(false);
 	}
 
-	void resetOverlayColor()
-	{
-		if (configManager.getConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.ORIGINAL_OVERLAY_COLOR) != null)
-		{
+	void resetOverlayColor() {
+		if (configManager.getConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.ORIGINAL_OVERLAY_COLOR) != null) {
 			configManager.setConfiguration(RuneLiteConfig.GROUP_NAME, OVERLAY_COLOR_CONFIG,
-				configManager.getConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.ORIGINAL_OVERLAY_COLOR));
+					configManager.getConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.ORIGINAL_OVERLAY_COLOR));
 			configManager.unsetConfiguration(ResourcePacksConfig.GROUP_NAME, ResourcePacksConfig.ORIGINAL_OVERLAY_COLOR);
 		}
 	}
@@ -651,7 +580,6 @@ public class ResourcePacksManager
 			{
 				return;
 			}
-
 			for (SpriteOverride spriteOverride : collection)
 			{
 				SpritePixels spritePixels = getSpritePixels(spriteOverride, currentPackPath);
@@ -720,7 +648,7 @@ public class ResourcePacksManager
 	public void addPropertyToWidget(WidgetOverride widgetOverride)
 	{
 		int color;
-		int alpha;
+		int alpha = -1;
 		if (colorProperties.containsKey(widgetOverride.name().toLowerCase())) {
 			String property = colorProperties.getProperty(widgetOverride.name().toLowerCase());
 			Color hex = ColorUtil.fromHex(property);
@@ -730,15 +658,12 @@ public class ResourcePacksManager
 					alpha = hex.getAlpha();
 				} else {
 					color = Integer.decode(property);
-					alpha = -1;
 				}
 			} else {
 				color = widgetOverride.getDefaultColor();
-				alpha = -1;
 			}
 		} else {
 			color = widgetOverride.getDefaultColor();
-			alpha = -1;
 		}
 
 		for (Integer childId : widgetOverride.getWidgetChildIds()) {
@@ -756,17 +681,27 @@ public class ResourcePacksManager
 
 					if (widgetOverride.getWidgetGroupId() == WidgetID.CHATBOX_GROUP_ID
 							&& arrayWidget.getWidth() != widgetOverride.getWidth()) {
-						//hard code fix for chatbox line separator
+						//hard code fix for chatbox line separator, uses (group and child) index[0] for fixed, and the top left corner segment [width25] in resized... so set the width to the value when in fixed/resized
 						continue;
 					}
-					if (widgetOverride.getWidgetGroupId() == 819
+
+					if ((widgetOverride.getWidgetGroupId() == WidgetOverride.Group.FORESTRY_SHOP_GROUP_ID ||
+							widgetOverride.getWidgetGroupId() == WidgetOverride.Group.GIANTS_FOUNDRY_GROUP_ID)
 							&& arrayWidget.getTextColor() != widgetOverride.getDefaultColor()) {
+						//forestry/giants foundry shop check, button colors changed based on scriptId, ignore color change if the textColor != default color in WidgetOverride
 						continue;
+
 					}
 
 					if((widgetOverride.getWidgetGroupId() == WidgetID.SMITHING_GROUP_ID)
 							&& arrayWidget.getText() != "") {
-						//smithing interface is weird, fixes the item name colors from being the same as the selected option
+						//anvil smithing widget creates the box at index [0] which also happens to be the same as the item name, ignore if the field is filled
+						continue;
+					}
+
+					if((widgetOverride.getWidgetGroupId() == WidgetOverride.Group.SEED_VAULT_GROUP_ID)
+							&& arrayWidget.getSpriteId() != -1) {
+						//seed vault search button corner and clicked overlay color share child [0], ignore if spriteId is present on the child
 						continue;
 					}
 
